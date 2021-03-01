@@ -1,0 +1,212 @@
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>YouTubeAPIv3サンプル | チャンネル情報取得（認証あり）</title>
+  <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  <script>
+
+    /* 開発キー
+       https://code.google.com/apis/console
+    var APIKEY="AIzaSyBWqa3wGl7b8DKxpepR6acqdvgn54_H-DA";
+    */
+    var APIKEY = "AIzaSyC3VBRnfUU9_qO1Gr1ARBO8BZLT-Sp6vFc";
+
+    /* クライアントID
+       https://code.google.com/apis/console
+    var OAUTH2_CLIENT_ID = "693654264922.apps.googleusercontent.com";
+    */
+    var OAUTH2_CLIENT_ID = "1090976309145-ach3n4qqmm02js32g7sbe10k66mo0g9q.apps.googleusercontent.com";
+
+    var OAUTH2_SCOPES = [
+      'https://www.googleapis.com/auth/yt-analytics.readonly',
+      'https://www.googleapis.com/auth/youtube.readonly'
+    ];
+    /* GoogleAPIロード後に呼び出される */
+    window.onJSClientLoad = function () {
+      dbg("★onJSClientLoad");
+      gapi.auth.init(function () {
+        window.setTimeout(checkAuth, 1);
+      });
+    };
+    /* OAuth認証チェック */
+    function checkAuth() {
+      dbg("★checkAuth");
+      gapi.auth.authorize({
+        client_id: OAUTH2_CLIENT_ID,
+        scope: OAUTH2_SCOPES,
+        immediate: true
+      }, handleAuthResult);
+    }
+    /* gapi.auth.authorize()の呼び出し結果を処理 */
+    function handleAuthResult(authResult) {
+      dbg("★handleAuthResult");
+      if (authResult) {
+        /* 認証に成功したら認証リンクを隠し、認証したら見れるものを表示 */
+        $('.pre-auth').hide();
+        $('.post-auth').show();
+        /* 処理実行 */
+        loadAPIClientInterfaces();
+      } else {
+        /* 認証に失敗したら認証リンクを表示し、認証しないと見れないものは非表示 */
+        $('.post-auth').hide();
+        $('.pre-auth').show();
+        displayMessage("ERROR: 認証に失敗しました");
+        /* ログインリンクを有効化 */
+        $('#login-link').click(function () {
+          gapi.auth.authorize({
+            client_id: OAUTH2_CLIENT_ID,
+            scope: OAUTH2_SCOPES,
+            immediate: false
+          }, handleAuthResult);
+        });
+      }
+    }
+    /* ページにメッセージを表示する */
+    function displayMessage(message) {
+      $("#message").text(message).show();
+    }
+    /* 上記で表示されたメッセージを隠す */
+    function hideMessage() {
+      $("#message").hide();
+    }
+    /* APIロード */
+    function loadAPIClientInterfaces() {
+      dbg("★handleAPILoaded");
+      gapi.client.setApiKey(APIKEY);
+      gapi.client.load('youtube', 'v3', getUserChannel);
+    }
+    /* チャンネル情報取得 */
+    function getUserChannel() {
+      dbg("★getUserChannel");
+      var request = gapi.client.youtube.channels.list({
+        mine: true,
+        part: "id, snippet, brandingSettings, contentDetails, invideoPromotion, statistics, topicDetails"
+      });
+      request.execute(function (resp) {
+        dbg(resp)
+        if (resp.error) {
+          displayMessage("ERROR: " + resp.message);
+        } else {
+          output(resp);
+        }
+      });
+    }
+    /* HTML出力 */
+    function output(data) {
+      dbg("★output");
+      var s = "";
+      var pageInfo = data.pageInfo;
+      s += "<li><b>pageInfo</b>:<ul>";
+      s += "<li>resultsPerPage:" + pageInfo.resultsPerPage + "</li>";
+      s += "<li>totalResults:" + pageInfo.totalResults + "</li>";
+      s += "</ul></li>";
+      var totalResults = data.pageInfo.totalResults; /* 結果セット内の結果の合計数 */
+      var resultsPerPage = data.pageInfo.resultsPerPage; /* APIレスポンスに含まれる結果の数 */
+      var total = Math.floor(totalResults / resultsPerPage);
+      dbg("total:" + total + "/resultsPerPage:" + resultsPerPage + "/totalResults:" + totalResults);
+      $.each(data.items, function (i, item) {
+        /* id */
+        s += (item.id) ? "<li>チャンネルID（id）:" + item.id + "</li>" : "";
+        /* snippet */
+        if (item.snippet) {
+          var snippet = item.snippet;
+          s += "<li><b>snippet</b>:<ul>";
+          s += (snippet.title) ? "<li>チャンネルタイトル（title）:" + snippet.title + "</li>" : "";
+          s += (snippet.publishedAt) ? "<li>登録日（publishedAt）:" + snippet.publishedAt + "</li>" : "";
+          s += (snippet.description) ? "<li>チャンネル説明文（description）:" + snippet.description + "</li>" : "";
+          if (snippet.thumbnails && snippet.thumbnails.default.url) {
+            /* サムネイル（default, medium, height） */
+            s += "<li>thumbnails:<ul>";
+            $.each(snippet.thumbnails, function (y, ytem) {
+              s += "<li>" + y + ":" + ytem.url + "<br><img src='" + ytem.url + "' /></li>";
+            });
+            s += "</ul></li>";
+          }
+          s += "</ul></li>";
+        }
+        /* brandingSettings */
+        if (item.brandingSettings) {
+          s += "<li><b>brandingSettings</b><ul>";
+          var brandingSettings = item.brandingSettings;
+          for (var o in brandingSettings) {
+            s += "<li>" + o + "<ul>";
+            for (var oo in brandingSettings[o]) {
+              if (o == "hints") {
+                s += "<li>" + oo + "<ul>";
+                for (var ooo in brandingSettings[o][oo]) {
+                  s += "<li>" + ooo + ": " + brandingSettings[o][oo][ooo] + "</li>";
+                }
+                s += "</ul>";
+              } else {
+                s += "<li>" + oo + ": " + brandingSettings[o][oo] + "</li>";
+              }
+            }
+            s += "</ul></li>";
+          }
+          s += "</ul></li>";
+        }
+        /* contentDetails */
+        if (item.contentDetails) {
+          s += "<li><b>contentDetails</b>:<ul>";
+          var contentDetails = item.contentDetails;
+          var googlePlusUserId = contentDetails.googlePlusUserId;
+          var relatedPlaylists = contentDetails.relatedPlaylists;
+          s += (googlePlusUserId) ? "<li>Google+のID（googlePlusUserId）:<a href='https://plus.google.com/'>" + googlePlusUserId + "</a></li>" : "";
+          if (relatedPlaylists) {
+            s += "<li>relatedPlaylists:<ul>";
+            s += (relatedPlaylists.favorites) ? "<li>お気に入りの動画（favorites）:<a href='http://www.youtube.com/playlist?list=" + relatedPlaylists.favorites + "'>" + relatedPlaylists.favorites + "</a></li>" : "";
+            s += (relatedPlaylists.likes) ? "<li>評価の高い動画（likes）:<a href='http://www.youtube.com/playlist?list=" + relatedPlaylists.likes + "'>" + relatedPlaylists.likes + "</a></li>" : "";
+            s += (relatedPlaylists.uploads) ? "<li>アップロード動画 （uploads）:<a href='http://www.youtube.com/playlist?list=" + relatedPlaylists.uploads + "'>" + relatedPlaylists.uploads + "</a></li>" : "";
+            /* 以下は認証しないと取得不可 */
+            s += (relatedPlaylists.watchHistory) ? "<li>閲覧履歴（watchHistory）:<a href='http://www.youtube.com/playlist?list=" + relatedPlaylists.watchHistory + "'>" + relatedPlaylists.watchHistory + "</a></li>" : "";
+            s += (relatedPlaylists.watchLater) ? "<li>後で見る（watchLater）:<a href='http://www.youtube.com/playlist?list=" + relatedPlaylists.watchLater + "'>" + relatedPlaylists.watchLater + "</a></li>" : "";
+            s += "</ul></li>";
+          }
+          s += "</ul></li>";
+        }
+        /* invideoPromotion 入ってない */
+        if (item.invideoPromotion) {
+          dbg(item.invideoPromotion);
+        }
+        /* statistics */
+        if (item.statistics) {
+          var statistics = item.statistics;
+          s += "<li><b>statistics</b>:";
+          s += "<ul>";
+          s += (statistics.commentCount) ? "<li>コメント数（commentCount）:" + statistics.commentCount + "</li>" : "";
+          s += (statistics.subscriberCount) ? "<li>登録者数（subscriberCount）:" + statistics.subscriberCount + "</li>" : "";
+          s += (statistics.videoCount) ? "<li>動画数（videoCount）:" + statistics.videoCount + "</li>" : "";
+          s += (statistics.viewCount) ? "<li>再生回数（viewCount）:" + statistics.viewCount + "</li>" : "";
+          s += "</ul>";
+          s += "</li>";
+        }
+        /* topicDetails 入ってない */
+        if (item.topicDetails) {
+          dbg(item.topicDetails);
+        }
+      });
+      $("#results").append("<h2>channels</h2><ul>" + s + "</ul>");
+    }
+    var dbg = function (str) {
+      try {
+        if (window.console && console.log) {
+          console.log(str);
+        }
+      } catch (err) {
+        //alert("error:"+err);
+      }
+    }
+  </script>
+  <script src="https://apis.google.com/js/client.js?onload=onJSClientLoad"></script>
+  <link rel="stylesheet" type="text/css" href="/common/css/example.css">
+</head>
+<body id="oauth">
+  <div id="login-container" class="pre-auth">
+    <p>このサンプルを試すには、YouTubeアカウントへのアクセスが必要です。<br>許可する場合は<a href="#" id="login-link">こちらから認証</a>を行ってください。</p>
+  </div>
+  <div class="post-auth">
+    <div id="message"></div>
+    <div id="results"></div>
+  </div>
+</body>
+</html>
