@@ -12,12 +12,12 @@ $(function () {
     player = new YT.Player('player', {
       width: w,
       height: h,
-      videoId: 'AYcQIdTi55I',
+      videoId: 'UXwNl9T-_4o',
       playerVars: {
         rel: 0,
         autoplay: 1,
         loop: 1,
-        playlist: 'AYcQIdTi55I',
+        playlist: 'UXwNl9T-_4o',
       },
       events: {
         'onReady': onPlayerReady,
